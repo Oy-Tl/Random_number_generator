@@ -133,7 +133,7 @@
   }
 
   .settings-card {
-    background: #fff;
+    background: rgba(255,255,255,0.88);
     border-radius: 16px;
     padding: 1.8rem 2rem;
     box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
@@ -230,28 +230,28 @@
   }
 
   .btn-generate {
-    background: #3b82f6;
+    background: rgba(59,130,246,0.88);
     color: #fff;
   }
   .btn-generate:hover {
-    background: #2563eb;
+    background: rgba(37,99,235,0.88);
   }
 
   .btn-start {
-    background: #22c55e;
+    background: rgba(34,197,94,0.88);
     color: #fff;
   }
   .btn-start:hover {
-    background: #16a34a;
+    background: rgba(22,163,74,0.88);
   }
 
   .btn-stop {
-    background: #ef4444;
+    background: rgba(239,68,68,0.88);
     color: #fff;
     animation: pulseStop 1.5s ease-in-out infinite;
   }
   .btn-stop:hover {
-    background: #dc2626;
+    background: rgba(220,38,38,0.88);
   }
 
   @keyframes pulseStop {
@@ -310,12 +310,12 @@
     height: 20px;
     left: 2px;
     bottom: 2px;
-    background: #fff;
+    background: rgba(255,255,255,0.88);
     border-radius: 50%;
     transition: transform 0.3s;
   }
   .toggle-switch input:checked + .toggle-slider {
-    background: #3b82f6;
+    background: rgba(59,130,246,0.88);
   }
   .toggle-switch input:checked + .toggle-slider::before {
     transform: translateX(20px);
@@ -343,10 +343,24 @@
 <body>
 
   <!-- Background motto lines -->
-  <div class="motto-group" id="mottoGroup">
+  <div class="motto-group" id="mottoGroup0">
     <span class="motto-line">抽到了就讲讲吧</span>
     <span class="motto-line">讲得不好也没关系，毕竟</span>
     <span class="motto-line">人非圣贤孰能无过</span>
+  </div>
+  <div class="motto-group" id="mottoGroup1">
+    <span class="motto-line">考成这样都是惯的！</span>
+  </div>
+  <div class="motto-group" id="mottoGroup2">
+    <span class="motto-line">孩子们你们自己看看像话不！</span>
+  </div>
+  <div class="motto-group" id="mottoGroup3">
+    <span class="motto-line">自己把自己当驽马</span>
+    <span class="motto-line">你也就能跑几十公里！</span>
+  </div>
+  <div class="motto-group" id="mottoGroup4">
+    <span class="motto-line">你不学有的人是学</span>
+    <span class="motto-line">一天差一点你想想一学期差多少</span>
   </div>
 
   <div class="result-section fade-in">
@@ -526,55 +540,96 @@
   // ── Motto toggle ──
   const mottoToggle = document.getElementById('mottoToggle');
   const mottoToggleLabel = document.getElementById('mottoToggleLabel');
-  const mottoGroup = document.getElementById('mottoGroup');
+  const mottoGroups = [
+    document.getElementById('mottoGroup0'),
+    document.getElementById('mottoGroup1'),
+    document.getElementById('mottoGroup2'),
+    document.getElementById('mottoGroup3'),
+    document.getElementById('mottoGroup4'),
+  ];
 
   mottoToggle.addEventListener('change', () => {
     const show = mottoToggle.checked;
-    mottoGroup.classList.toggle('hide-motto', !show);
+    mottoGroups.forEach(g => g.classList.toggle('hide-motto', !show));
   });
 
-  // ── Randomly position motto group in safe corner/edge areas ──
-  function randomizeMottoPosition() {
+  // ── Randomly position all motto groups — no overlap, evenly spread ──
+  function randomizeMottoPositions() {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const padding = 24; // px from edge
+    const padding = 20;
+    const gap = 18; // minimum gap between groups
 
-    // Measure the group to ensure it fits
-    const rect = mottoGroup.getBoundingClientRect();
-    const gw = rect.width;
-    const gh = rect.height;
+    // Measure all groups
+    const sizes = mottoGroups.map(g => {
+      const r = g.getBoundingClientRect();
+      return { w: r.width, h: r.height };
+    });
 
-    // Only use the 4 corners + 4 mid-edges, where no UI elements exist.
-    // UI occupies roughly: top-center (result half) + center (settings card max 680px).
-    // Safe corners are well outside the central column and result area.
-    const anchors = [
-      { top: padding,                    left: padding },                    // top-left
-      { top: padding,                    left: vw - gw - padding },          // top-right
-      { top: vh * 0.30,                 left: padding },                    // mid-left (above settings)
-      { top: vh * 0.30,                 left: vw - gw - padding },          // mid-right
-      { top: vh * 0.75 - gh,            left: padding },                    // lower-left
-      { top: vh * 0.75 - gh,            left: vw - gw - padding },          // lower-right
-      { top: vh - gh - padding,         left: padding },                    // bottom-left
-      { top: vh - gh - padding,         left: vw - gw - padding },          // bottom-right
+    // Safe vertical zones that avoid the centered white card (~50vh–85vh)
+    const safeZones = [
+      { tMin: padding,              tMax: vh * 0.44 },
+      { tMin: vh * 0.86,            tMax: vh - padding },
     ];
 
-    // Filter out anchors that would clip outside the viewport
-    const valid = anchors.filter(a =>
-      a.top >= 0 && a.left >= 0 &&
-      a.top + gh <= vh && a.left + gw <= vw
-    );
+    // Generate fine-grained candidate positions across both safe zones
+    const candidates = [];
+    const steps = 20;
+    safeZones.forEach(zone => {
+      for (let i = 0; i <= steps; i++) {
+        const top = zone.tMin + (i / steps) * (zone.tMax - zone.tMin);
+        candidates.push({ top, side: 'left' });
+        candidates.push({ top, side: 'right' });
+      }
+    });
 
-    const chosen = valid[Math.floor(Math.random() * valid.length)] || anchors[0];
+    // Shuffle so each reload gives a different layout
+    const shuffled = candidates.slice().sort(() => Math.random() - 0.5);
 
-    mottoGroup.style.top  = chosen.top + 'px';
-    mottoGroup.style.left = chosen.left + 'px';
-    // Subtle random rotation
-    const rot = (Math.random() - 0.5) * 4;
-    mottoGroup.style.transform = 'rotate(' + rot + 'deg)';
+    const placed = []; // { top, left, w, h }
+
+    mottoGroups.forEach((group, i) => {
+      const sw = sizes[i].w;
+      const sh = sizes[i].h;
+      let chosen = null;
+
+      for (const c of shuffled) {
+        const left = c.side === 'left' ? padding : vw - sw - padding;
+        const top  = Math.max(padding, Math.min(vh - sh - padding, c.top));
+
+        // Collision check against already-placed groups
+        let overlap = false;
+        for (const p of placed) {
+          const horzGap = left + sw + gap <= p.left || p.left + p.w + gap <= left;
+          const vertGap = top + sh + gap <= p.top  || p.top + p.h + gap <= top;
+          if (!horzGap && !vertGap) { overlap = true; break; }
+        }
+        if (!overlap) {
+          chosen = { top, left };
+          placed.push({ top, left, w: sw, h: sh });
+          break;
+        }
+      }
+
+      // Fallback: pick a random safe position if no candidate worked
+      if (!chosen) {
+        const side = Math.random() < 0.5 ? 'left' : 'right';
+        const zone = safeZones[Math.floor(Math.random() * safeZones.length)];
+        const top  = zone.tMin + Math.random() * Math.max(0, zone.tMax - zone.tMin - sh);
+        const left = side === 'left' ? padding : vw - sw - padding;
+        chosen = { top, left };
+        placed.push({ top, left, w: sw, h: sh });
+      }
+
+      group.style.top  = chosen.top + 'px';
+      group.style.left = chosen.left + 'px';
+      const rot = (Math.random() - 0.5) * 4;
+      group.style.transform = 'rotate(' + rot + 'deg)';
+    });
   }
 
-  randomizeMottoPosition();
-  window.addEventListener('resize', randomizeMottoPosition);
+  randomizeMottoPositions();
+  window.addEventListener('resize', randomizeMottoPositions);
 
   // ── Initialize on load ── (display blank until user clicks generate)
 </script>
